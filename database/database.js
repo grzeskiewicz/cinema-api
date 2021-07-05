@@ -197,6 +197,8 @@ const newshowing = function (req, res) {
     let values = Object.keys(req.body).map(function (key) {
         return req.body[key];
     });
+    console.log(values);
+
     values[3] = values[3].slice(0, 19).replace('T', ' ');
     values = values.map((record) => {
         return `'${record}'`;
@@ -247,7 +249,7 @@ const deleteshowing = function (req, res) {
 
 const deletefilm = function (req, res) { // delete tickets(showing(film))
     const film = req.body;
-
+    console.log(film);
     connection.query("DELETE FROM films WHERE ID=" + film.filmid, function (err, result) {
         if (err) res.json({ succes: false, msg: err });
         res.json({ succes: true, msg: "FILM_DELETED" });
@@ -259,7 +261,6 @@ const editfilm = function (req, res) {
     connection.query(`UPDATE films SET title='${film.title}',director='${film.director}',genre='${film.genre}',length='${film.length}',category='${film.category}',imageUrl='${film.imageUrl}' WHERE id='${film.id}'`, function (err, result) {
         if (err) res.json({ success: false, msg: err });
         res.json({ succes: true, msg: film });
-
     });
 }
 
