@@ -59,7 +59,7 @@ const register = function (req, res) {
         res.json({ success: false, msg: "User exists already" });
     } else {
         vals[1] = `"${bcrypt.hashSync(req.body.password, 10)}"`;
-        connection.query("INSERT INTO customers(email,password,name,surename,telephone) VALUES(" + vals.join(",") + ")", function (err, result) {
+        connection.query("INSERT INTO customers(email,password,name,surname,telephone) VALUES(" + vals.join(",") + ")", function (err, result) {
             if (err) {
                 if (err.code === "23505") { //23505 code for key existing already
                     res.json({ success: false, msg: "User exists already!" });
@@ -148,7 +148,7 @@ const login = function (req, res) {
                 //res.status(401).json({success:false, msg: 'Authentication failed. Wrong password.' });
                 res.json({ success: false, msg: "Authentication failed. Wrong password" });
             } else {
-                return res.json({ success: true, msg: "Loging in success!", token: 'JWT ' + jwt.sign({ email: user.email, name: user.name, surename: user.surename, id: user.id }, 'RESTFULAPIs') });
+                return res.json({ success: true, msg: "Loging in success!", token: 'JWT ' + jwt.sign({ email: user.email, name: user.name, surname: user.surname, id: user.id }, 'RESTFULAPIs') });
             }
         } else {
             // res.status(401).json({ msg: 'Authentication failed. User not found.' });
@@ -166,10 +166,10 @@ const memberinfo = function (req, res, next) {
             if (decode === undefined) {
                 res.json({ success: false, msg: "No token" });
             }
-            connection.query("select email from customers where email='" + decode.email + "'", function (err, rows) {
+            connection.query("select id,email from customers where email='" + decode.email + "'", function (err, rows) {
                 const user = rows[0];
                 if (user) {
-                    res.json({ success: true, msg: decode.email });
+                    res.json({ success: true, msg: { username: decode.email, id: decode.id } });
                 } else {
                     res.json({ success: false, msg: "No such user registered" });
                 }

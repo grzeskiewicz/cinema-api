@@ -21,6 +21,9 @@ app.get('/seatsshowing/:showingid', db.seatsshowing);
 app.get('/seatstaken/:showingid', db.seatstaken);
 
 app.post('/newticket', db.newticket);
+app.post('/newticket', db.createPDF);
+app.post('/newticket', db.sendEmail);
+
 app.post('/newshowing', db.newshowing);
 app.post('/newfilm', db.newfilm);
 app.post('/newprice', db.newprice);
@@ -32,6 +35,8 @@ app.post('/deleteticket', db.deleteticket);
 
 app.post('/editfilm', db.editfilm);
 app.post('/editcustomer', db.editcustomer);
+app.post('/editprice', db.editprice);
+
 
 app.get('/tickets', db.ticketsquery);
 app.get('/rooms', db.roomsquery);

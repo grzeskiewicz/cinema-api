@@ -9,10 +9,23 @@ const dbConfig = require('../dbConfig');
 const mailConfig = require('../mailConfig');
 const app = express();
 const nodemailer = require('nodemailer');
+const QRCode = require('qrcode')
 const bodyParser = require('body-parser');
 app.use(bodyParser.urlencoded({ extended: true })); // support encoded bodies
 app.use(bodyParser.json()); // support json encoded bodies 
 app.use(express.json());
+//app.use('/pdf', express.static(__dirname + '/public/pdf'));
+
+
+const roomABC = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I'];
+
+
+function validateValues(obj) {
+    for (const [key, value] of Object.entries(obj)) {
+        if (String(value).trim() === '' || String(value) === undefined || String(value) === null) return false;
+    }
+    return true;
+}
 
 
 
@@ -85,11 +98,9 @@ const seatstaken = function (req, res) {
 }
 
 
-
-
-
-const sendEmail = (tickets) => {
-    console.log(tickets);
+const sendEmail = (req, res, next) => { //tickets,ticketsIDs
+    const tickets = req.body.tickets;
+    const ticketsIDs = req.body.ticketsIDs;
     htmlTemplate = `
     <html>
     <head>
@@ -102,6 +113,7 @@ const sendEmail = (tickets) => {
     <h3>You have successfully ordered tickets for the show:</h3>
         <div id="ticket">
         <p>${tickets.showingDesc.title} Date:${tickets.showingDesc.fullDate} ${tickets.showingDesc.date}</p>
+        <p>Room: ${roomABC[tickets.showingDesc.room]}</p>
         <p style="font-weight:bold;">Seats: ${tickets.seats}</p>
         <hr><p>Tickets are attached in the email!</p>
         <div>
@@ -118,29 +130,73 @@ const sendEmail = (tickets) => {
     </div> 
     </body>
   </html>`;
-
+    //option for multiple pdfs, uncomment below
+    /* const attachments = [];
+     for (const ticketID of ticketsIDs) {
+         const path = `./public/pdf/${ticketID}.pdf`
+         attachments.push({ filename: `${ticketID}.pdf`, path: path });
+     }*/
+    const path = `./public/pdf/${ticketsIDs[0]}.pdf`
 
     const mailOptions = {
         from: 'cinemanode.api@gmail.com',
         to: tickets.email,
         subject: 'Tickets Cinemanode',
-        html: htmlTemplate
+        html: htmlTemplate,
+        attachments: [{ path: path }]
     };
 
     transporter.sendMail(mailOptions, function (error, info) {
         if (error) {
             console.log(error);
         } else {
-            console.log('Email sent: ' + info.response);
+            const file = fs.createReadStream(path);
+            res.setHeader('Content-Type', 'application/pdf');
+            res.setHeader('Content-Disposition', `attachment; filename=${ticketsIDs[0]}.pdf`);
+            file.pipe(res);
+            res.json({ success: true, msg: "Tickets created!", ticketsIDs: ticketsIDs }); //last from the route
+            //  console.log('Email sent: ' + info.response);
         }
     });
 }
 
 
+const createPDF = (req, res, next) => { //tickets,ticketsIDs
+    // If you use 'inline' here it will automatically open the PDF
 
-const newticket = function (req, res) {
-    sendEmail(req.body);
-    const showingDesc = req.body.showingDesc;
+    const tickets = req.body.tickets;
+    const ticketsIDs = req.body.ticketsIDs;
+    const doc = new PDFDocument({ size: 'A5' });
+
+    for (let i = 0; i < ticketsIDs.length; i++) {
+        QRCode.toFile(`./public/qr/${ticketsIDs[i]}.png`, `${tickets.userid}#${ticketsIDs[i]}`, function (err) { //option for multiple files: move doc=new pdfdoc inside the loop
+            if (err) throw err;
+
+            const content = `
+              Film: ${tickets.showingDesc.title} 
+              Date: ${tickets.showingDesc.fullDate} ${tickets.showingDesc.date}
+              Room: ${roomABC[tickets.showingDesc.room]}
+              Seat: ${tickets.seats[i]}`;
+
+            doc.moveTo(20, 10).lineTo(400, 10).stroke();
+            doc.moveTo(20, 580).lineTo(400, 580).stroke();
+            doc.text(content, 30, 30);
+            doc.image(`./public/qr/${ticketsIDs[i]}.png`);
+            if (i < ticketsIDs.length - 1) doc.addPage();
+            if (i === ticketsIDs.length - 1) {
+                doc.pipe(fs.createWriteStream(`./public/pdf/${ticketsIDs[0]}.pdf`));
+                doc.end();
+                next();
+            }
+        });
+
+    }
+}
+
+
+
+const newticket = function (req, res, next) {
+    const bodyCopy = JSON.parse(JSON.stringify(req.body)); //deep copy
     delete req.body.showingDesc;
     const vals = Object.keys(req.body).map(function (key) { // DO I NEED IT??
         return req.body[key];
@@ -152,39 +208,26 @@ const newticket = function (req, res) {
         }
     });
     const seats = req.body.seats;
-    async.forEachOf(seats, function (seat) {
-        //2018-05-02T09:28:00.000Z
-        connection.query(`INSERT INTO tickets(showing,seat,price,email,status,purchasedate) VALUES('${req.body.showing}','${seat}','${req.body.price}','${req.body.email}','1','${moment().format()}')`, vals, function (err, result) {
-            if (err) res.json({ success: false, msg: err });
-        });
+    const queryArray = [];
+    for (const seat of seats) {
+        const record = `'${req.body.showing}','${seat}','${req.body.price}','${req.body.email}','1','${moment().format()}'`;
+        queryArray.push(record);
+    }
+    const valuesQuery = queryArray.map((record) => {
+        return `(${record})`;
     });
 
+    connection.query(`INSERT INTO tickets(showing,seat,price,email,status,purchasedate) VALUES${valuesQuery}`, function (err, result) {
+        const ticketsIDs = [];
+        let ticketID = new Number(result.insertId);
+        for (let i = 0; i < result.affectedRows; i++) {
+            ticketsIDs.push(ticketID++);
+        }
+        if (err) res.json({ success: false, msg: err });
+        req.body = { ticketsIDs: ticketsIDs, tickets: bodyCopy };
+        next();
+    });
 
-
-
-
-
-    /* PDF creating test
-        const doc = new PDFDocument()
-       // let filename = req.body.filename
-       let filename="test";
-        // Stripping special characters
-        filename = encodeURIComponent(filename) + '.pdf'
-        // Setting response to 'attachment' (download).
-        // If you use 'inline' here it will automatically open the PDF
-      //  res.setHeader('Content-disposition', 'attachment; filename="' + filename + '"')
-      //  res.setHeader('Content-type', 'application/pdf')
-    
-    
-        const content = "Test content";
-        doc.y = 300
-        doc.text(content, 50, 50)
-        doc.pipe(fs.createWriteStream('/tmp/output.pdf'));
-       // doc.pipe(res)
-        doc.end() */
-
-
-    res.json({ success: true, msg: "Tickets created!" });
 
     // connection.end();
     // next();
@@ -197,7 +240,6 @@ const newshowing = function (req, res) {
     let values = Object.keys(req.body).map(function (key) {
         return req.body[key];
     });
-    console.log(values);
 
     values[3] = values[3].slice(0, 19).replace('T', ' ');
     values = values.map((record) => {
@@ -214,19 +256,22 @@ const newshowing = function (req, res) {
 
 
 const newfilm = function (req, res) {
-    console.log(req.body);
-    const params = req.body;
-    let values = Object.keys(req.body).map(function (key) {
-        return req.body[key];
-    });
-    values = values.map((record) => {
-        return `'${record}'`;
-    });
-console.log(values)
-    connection.query("INSERT INTO films(title,director,genre,length,category,imageurl) VALUES(" + values.join(",") + ")", function (err, result) {
-        if (err) res.json({ success: false, msg: err });
-        res.json({ success: true, msg: values });
-    });
+    const bodyCopy = JSON.parse(JSON.stringify(req.body));
+    delete bodyCopy.imageUrl;
+    if (!validateValues(bodyCopy)) {
+        res.json({ success: false, msg: "BAD_VALUES" });
+    } else {
+        let values = Object.keys(req.body).map(function (key) {
+            return req.body[key];
+        });
+        values = values.map((record) => {
+            return `'${record}'`;
+        });
+        connection.query("INSERT INTO films(title,director,genre,length,category,imageurl) VALUES(" + values.join(",") + ")", function (err, result) {
+            if (err) res.json({ success: false, msg: err });
+            res.json({ success: true, msg: values });
+        });
+    }
 }
 
 
@@ -237,10 +282,17 @@ const newprice = function (req, res) {
     });
 }
 
+const editprice = function (req, res) {
+    const price = req.body;
+    connection.query(`UPDATE prices SET normal='${price.normal}',discount='${price.discount}' WHERE id='${price.id}'`, function (err, result) {
+        if (err) res.json({ success: false, msg: err });
+        res.json({ succes: true, msg: price });
+    });
+}
+
 
 const deleteshowing = function (req, res) {
-    console.log(req.body);
-    connection.query(`DELETE FROM showings WHERE ID="${req.body.showid}"`, function (err, result) { 
+    connection.query(`DELETE FROM showings WHERE ID="${req.body.showid}"`, function (err, result) {
         if (err) res.json({ success: false, msg: err });
         res.json({ succes: true, msg: "Showing deleted" });
     });
@@ -258,6 +310,7 @@ const deletefilm = function (req, res) { // delete tickets(showing(film))
 
 const editfilm = function (req, res) {
     const film = req.body;
+    console.log(film);
     connection.query(`UPDATE films SET title='${film.title}',director='${film.director}',genre='${film.genre}',length='${film.length}',category='${film.category}',imageUrl='${film.imageUrl}' WHERE id='${film.id}'`, function (err, result) {
         if (err) res.json({ success: false, msg: err });
         res.json({ succes: true, msg: film });
@@ -267,7 +320,7 @@ const editfilm = function (req, res) {
 
 const editcustomer = function (req, res) {
     const customer = req.body;
-    connection.query(`UPDATE customers SET email='${customer.email}',name='${customer.name}',surename='${customer.surename}',telephone='${customer.telephone}' WHERE id='${customer.id}'`, function (err, result) {
+    connection.query(`UPDATE customers SET email='${customer.email}',name='${customer.name}',surname='${customer.surname}',telephone='${customer.telephone}' WHERE id='${customer.id}'`, function (err, result) {
         if (err) res.json({ success: false, msg: err });
         res.json({ succes: true, msg: customer });
     });
@@ -345,29 +398,5 @@ const filmsquery = function (req, res) {
 }
 
 
-/*
-const sendtickets = function (req, res) {
 
-    const params = req.body;
-    console.log(params.tickets);
-
-
-    const mailOptions = {
-        from: 'charlotte.kihn6@ethereal.email',
-        to: 'benuch91@gmail.com',
-        subject: 'Tickets Cinemanode',
-        html: params.tickets
-    };
-
-    transporter.sendMail(mailOptions, function (error, info) {
-        if (error) {
-            console.log(error);
-        } else {
-            console.log('Email sent: ' + info.response);
-        }
-    });
-    res.json({ "msg": params })
-}*/
-
-
-module.exports = { showings, showingsbydate, seatsshowing, seatstaken, newticket, ticketsquery, filmsquery, pricesquery, roomsquery, showingsquery, newshowing, newfilm, newprice, deleteshowing, deletefilm, deleteprice, deleteticket, ticketsbycustomer, editfilm, editcustomer };
+module.exports = { showings, showingsbydate, seatsshowing, seatstaken, newticket, createPDF, sendEmail, ticketsquery, filmsquery, pricesquery, roomsquery, showingsquery, newshowing, newfilm, newprice, deleteshowing, deletefilm, deleteprice, deleteticket, ticketsbycustomer, editfilm, editcustomer, editprice };

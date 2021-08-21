@@ -14,6 +14,7 @@ const io = require('socket.io')(http, {
 app.use(cors());
 //app.use(bodyParser.urlencoded({ extended: true })); // support encoded bodies
 //app.use(bodyParser.json()); // support json encoded bodies 
+app.use('/pdf', express.static(__dirname + '/public/pdf'));
 
 
 
@@ -24,6 +25,7 @@ const routes = require('./routes/routes');
 app.options('*', cors()) // include before other routes
 app.use('/', routes);
 
+console.log(__dirname);
 
 
 
