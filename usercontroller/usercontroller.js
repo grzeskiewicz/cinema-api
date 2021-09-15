@@ -46,30 +46,27 @@ function handleDisconnect() {
 handleDisconnect();
 
 const register = function (req, res) {
-    let userExists;
     let vals = Object.keys(req.body).map((key) => `"${req.body[key]}"`);
 
-
     connection.query(`select 1 from customers where email='${req.body.email}'`, function (err, rows) {
-        if (err) res.json(err);
-        userExists = rows[0];
-    });
-
-    if (userExists) {
-        res.json({ success: false, msg: "User exists already" });
-    } else {
-        vals[1] = `"${bcrypt.hashSync(req.body.password, 10)}"`;
-        connection.query("INSERT INTO customers(email,password,name,surname,telephone) VALUES(" + vals.join(",") + ")", function (err, result) {
-            if (err) {
-                if (err.code === "23505") { //23505 code for key existing already
-                    res.json({ success: false, msg: "User exists already!" });
+        if (err) res.json({ success: false, msg: err });
+        const userExists = rows[0];
+        if (userExists) {
+            res.json({ success: false, msg: "User exists already" });
+        } else {
+            vals[1] = `"${bcrypt.hashSync(req.body.password, 10)}"`;
+            connection.query("INSERT INTO customers(email,password,name,surname,telephone) VALUES(" + vals.join(",") + ")", function (err2, result) {
+                if (err2) {
+                    if (err2.code === "23505") { //23505 code for key existing already
+                        res.json({ success: false, msg: "User exists already!" });
+                    }
+                } else {
+                    sendEmailRegistered(req.body.email, req.body.name);
+                    res.json({ success: true, msg: "Registration successful!" });
                 }
-            } else {
-                sendEmailRegistered(req.body.email, req.body.name);
-                res.json({ success: true, msg: "Registration successful!" });
-            }
-        });
-    }
+            });
+        }
+    });
 
 }
 

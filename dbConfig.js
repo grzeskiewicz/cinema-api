@@ -1,9 +1,9 @@
 module.exports = {
     config: {
         host: 'localhost',
-        user: 'benake',
-        password: 'Palkast123!',
-        database: 'cinema',
+        user: process.env.DB_USER,
+        password: process.env.DB_PASS,
+        database: process.env.DB_NAME,
         port: 3306
     }
 }

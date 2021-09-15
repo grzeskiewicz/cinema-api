@@ -24,6 +24,9 @@ app.post('/newticket', db.newticket);
 app.post('/newticket', db.createPDF);
 app.post('/newticket', db.sendEmail);
 
+app.post('/getpdf', db.getPDF);
+
+
 app.post('/newshowing', db.newshowing);
 app.post('/newfilm', db.newfilm);
 app.post('/newprice', db.newprice);
@@ -49,8 +52,8 @@ app.post('/ticketsbycustomer', db.ticketsbycustomer);
 
 //app.route('/newticket').post(user.loginRequired, db.newticket);
 
-app.post('/registertest', user.register);
-app.post('/logintest', user.login);
+app.post('/register', user.register);
+app.post('/login', user.login);
 app.get('/memberinfo', user.memberinfo);
 app.get('/customers', user.customers);
 app.post('/deletecustomer', user.deletecustomer);

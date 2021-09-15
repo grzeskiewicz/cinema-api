@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express'),
     app = express();
     app.use(express.json()); 
@@ -24,9 +25,6 @@ app.use(express.static('public/uploads'));
 const routes = require('./routes/routes');
 app.options('*', cors()) // include before other routes
 app.use('/', routes);
-
-console.log(__dirname);
-
 
 
 io.on('connection', function (socket) {

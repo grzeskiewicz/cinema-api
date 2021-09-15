@@ -2,8 +2,8 @@ module.exports = {
     config: {
         service: 'gmail',
         auth: {
-            user: 'cinemanode.api@gmail.com',
-            pass: 'palkast1'
+            user: process.env.MAIL_USER,
+            pass: process.env.MAIL_PASS
         }
     }
 } 

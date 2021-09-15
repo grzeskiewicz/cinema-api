@@ -146,42 +146,50 @@ const sendEmail = (req, res, next) => { //tickets,ticketsIDs
         attachments: [{ path: path }]
     };
 
+
     transporter.sendMail(mailOptions, function (error, info) {
         if (error) {
             console.log(error);
         } else {
-            const file = fs.createReadStream(path);
-            res.setHeader('Content-Type', 'application/pdf');
-            res.setHeader('Content-Disposition', `attachment; filename=${ticketsIDs[0]}.pdf`);
-            file.pipe(res);
+
             res.json({ success: true, msg: "Tickets created!", ticketsIDs: ticketsIDs }); //last from the route
-            //  console.log('Email sent: ' + info.response);
         }
     });
 }
 
 
-const createPDF = (req, res, next) => { //tickets,ticketsIDs
-    // If you use 'inline' here it will automatically open the PDF
+const getPDF = (req, res) => {
+    const path = `./public/pdf/${req.body.ticketid}.pdf`;
+    const src = fs.createReadStream(path);
+    res.writeHead(200, {
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `attachment; filename=${req.body.ticketid}.pdf`,
+        'Content-Transfer-Encoding': 'Binary'
+    });
+    src.pipe(res);
+}
 
+
+const createPDF = (req, res, next) => { //tickets,ticketsIDs
     const tickets = req.body.tickets;
     const ticketsIDs = req.body.ticketsIDs;
     const doc = new PDFDocument({ size: 'A5' });
-
     for (let i = 0; i < ticketsIDs.length; i++) {
-        QRCode.toFile(`./public/qr/${ticketsIDs[i]}.png`, `${tickets.userid}#${ticketsIDs[i]}`, function (err) { //option for multiple files: move doc=new pdfdoc inside the loop
+        QRCode.toFile(`./public/qr/${ticketsIDs[i]}.png`, `${tickets.userid}#${ticketsIDs[i]}`, {margin:0},function (err) { //option for multiple files: move doc=new pdfdoc inside the loop
             if (err) throw err;
 
-            const content = `
-              Film: ${tickets.showingDesc.title} 
-              Date: ${tickets.showingDesc.fullDate} ${tickets.showingDesc.date}
-              Room: ${roomABC[tickets.showingDesc.room]}
-              Seat: ${tickets.seats[i]}`;
+            // const content = `Film: ${tickets.showingDesc.title} Date: ${tickets.showingDesc.fullDate} ${tickets.showingDesc.date} Room: ${roomABC[tickets.showingDesc.room]} Seat: ${tickets.seats[i]}`;
+            doc.text(`Ticket ID: #${ticketsIDs[i]}`, 20, 15, { align: 'left' });
+            doc.text(`Email: ${tickets.email}`, { align: 'left' });
+            doc.text(`Film: ${tickets.showingDesc.title}`, { align: 'left' });
+            doc.text(`Date: ${tickets.showingDesc.fullDate} ${tickets.showingDesc.date}`, { align: 'left' });
+            doc.text(`Room: ${roomABC[tickets.showingDesc.room]}`, { align: 'left' });
+            doc.text(`Seat: ${tickets.seats[i]}`, { align: 'left' });
 
+
+            doc.image(`./public/qr/${ticketsIDs[i]}.png`, 300, 15, { width: 100, height: 100, align: 'right' });
             doc.moveTo(20, 10).lineTo(400, 10).stroke();
             doc.moveTo(20, 580).lineTo(400, 580).stroke();
-            doc.text(content, 30, 30);
-            doc.image(`./public/qr/${ticketsIDs[i]}.png`);
             if (i < ticketsIDs.length - 1) doc.addPage();
             if (i === ticketsIDs.length - 1) {
                 doc.pipe(fs.createWriteStream(`./public/pdf/${ticketsIDs[0]}.pdf`));
@@ -301,7 +309,6 @@ const deleteshowing = function (req, res) {
 
 const deletefilm = function (req, res) { // delete tickets(showing(film))
     const film = req.body;
-    console.log(film);
     connection.query("DELETE FROM films WHERE ID=" + film.filmid, function (err, result) {
         if (err) res.json({ succes: false, msg: err });
         res.json({ succes: true, msg: "FILM_DELETED" });
@@ -310,7 +317,6 @@ const deletefilm = function (req, res) { // delete tickets(showing(film))
 
 const editfilm = function (req, res) {
     const film = req.body;
-    console.log(film);
     connection.query(`UPDATE films SET title='${film.title}',director='${film.director}',genre='${film.genre}',length='${film.length}',category='${film.category}',imageUrl='${film.imageUrl}' WHERE id='${film.id}'`, function (err, result) {
         if (err) res.json({ success: false, msg: err });
         res.json({ succes: true, msg: film });
@@ -399,4 +405,4 @@ const filmsquery = function (req, res) {
 
 
 
-module.exports = { showings, showingsbydate, seatsshowing, seatstaken, newticket, createPDF, sendEmail, ticketsquery, filmsquery, pricesquery, roomsquery, showingsquery, newshowing, newfilm, newprice, deleteshowing, deletefilm, deleteprice, deleteticket, ticketsbycustomer, editfilm, editcustomer, editprice };
+module.exports = { showings, showingsbydate, seatsshowing, seatstaken, newticket, createPDF, sendEmail, getPDF, ticketsquery, filmsquery, pricesquery, roomsquery, showingsquery, newshowing, newfilm, newprice, deleteshowing, deletefilm, deleteprice, deleteticket, ticketsbycustomer, editfilm, editcustomer, editprice };
