@@ -1,5 +1,5 @@
 # cinema-api
-Cinema Projekct - backend
+Cinema Project - backend
 1. Import cinema.sql to your database.
 2. Create ENV files for your local instance:
 DB_USER='user'
